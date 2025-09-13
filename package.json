@@ -12,15 +12,19 @@
   "dependencies": {
     "@web3auth/base": "^9.7.0",
     "@web3auth/core": "^4.6.0",
+    "@web3auth/node-sdk": "^4.1.0",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",
+    "ethers": "^6.9.0",
     "express": "^5.1.0",
     "firebase-admin": "^13.5.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.18.1",
     "morgan": "^1.10.1",
-    "node-mailer": "^0.1.1"
+    "nodemailer": "^7.0.6",
+    "telnyx": "^2.1.1"
   },
   "devDependencies": {
     "@types/express": "^5.0.3",
