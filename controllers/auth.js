@@ -286,6 +286,7 @@ async function registerUser(req, res) {
                 id: user._id,
                 email: user.email,
                 fullName: user.fullName,
+                phoneNumber: user.phoneNumber,
                 emailVerified: user.emailVerified,
                 kycStatus: user.kycStatus,
                 walletAddress: user.walletAddress
@@ -367,6 +368,7 @@ async function loginUser(req, res) {
                 id: user._id,
                 email: user.email,
                 fullName: user.fullName,
+                phoneNumber: user.phoneNumber,
                 emailVerified: user.emailVerified,
                 kycStatus: user.kycStatus,
                 walletAddress: user.walletAddress
@@ -416,6 +418,7 @@ async function verifyToken(req, res) {
                 id: user._id,
                 email: user.email,
                 fullName: user.fullName,
+                phoneNumber: user.phoneNumber,
                 emailVerified: user.emailVerified,
                 kycStatus: user.kycStatus,
                 walletAddress: user.walletAddress

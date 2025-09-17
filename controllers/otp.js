@@ -4,6 +4,19 @@ const telnyx = require('telnyx')(process.env.TELNYX_API_KEY);
 
 // In-memory storage removed; using MongoDB via Mongoose
 
+// Track recent OTP requests to prevent duplicates
+const recentRequests = new Map();
+
+// Clean up old requests every 5 minutes
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, timestamp] of recentRequests.entries()) {
+        if (now - timestamp > 300000) { // 5 minutes
+            recentRequests.delete(key);
+        }
+    }
+}, 300000);
+
 /**
  * Send OTP to mail function
  * @param {email} req
@@ -141,6 +154,21 @@ async function sendPhoneOtp(req, res) {
             });
         }
 
+        // Check for recent requests to prevent duplicates
+        const requestKey = `phone_${phoneNumber}`;
+        const now = Date.now();
+        const lastRequest = recentRequests.get(requestKey);
+        
+        if (lastRequest && (now - lastRequest) < 60000) { // 60 seconds cooldown
+            return res.status(429).json({
+                success: false,
+                error: 'Please wait before requesting another OTP'
+            });
+        }
+        
+        // Record this request
+        recentRequests.set(requestKey, now);
+
         // Generate 6-digit OTP
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
         
@@ -154,7 +182,7 @@ async function sendPhoneOtp(req, res) {
           type: 'SMS'
         }
         const { data: message } = await telnyx.messages.create(smsRequest);
-        console.log(message);
+        console.log('Telnyx message sent:', message);
         // Store OTP in database
         await Otp.deleteMany({ email: `phone_${phoneNumber}` });
         await Otp.create({
@@ -177,9 +205,20 @@ async function sendPhoneOtp(req, res) {
 
     } catch (error) {
         console.error('Phone OTP send error:', error);
+        console.log(error.responseBody);
+        // Handle specific Telnyx errors
+        if (error.statusCode === 409) {
+            return res.status(409).json({
+                success: false,
+                error: error,
+                details: 'This could be due to spend limits, unverified phone numbers, or service conflicts.'
+            });
+        }
+        
         return res.status(500).json({
             success: false,
-            error: 'Failed to send phone OTP'
+            error: 'Failed to send phone OTP',
+            details: error.message
         });
     }
 }

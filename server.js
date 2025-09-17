@@ -7,6 +7,8 @@ dotenv.config()
 
 const otpRouter = require('./routes/otp')
 const authRouter = require('./routes/auth')
+const transactionRouter = require('./routes/transaction')
+const paymentMethodRouter = require('./routes/paymentMethod')
 const app = express()
 const port = 3000
 
@@ -16,6 +18,8 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }))
 
 app.use('/api/otp', otpRouter)
 app.use('/api/auth', authRouter)
+app.use('/api/transactions', transactionRouter)
+app.use('/api/payment-methods', paymentMethodRouter)
 
 // Test endpoint to check database connection
 app.get('/api/test-db', async (req, res) => {
