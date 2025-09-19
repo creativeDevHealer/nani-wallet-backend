@@ -35,28 +35,10 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  kycStatus: {
-    type: String,
-    enum: ['pending', 'approved', 'rejected'],
-    default: 'pending'
-  },
-  kycDocuments: {
-    idDocument: {
-      type: String,
-      default: null
-    },
-    selfie: {
-      type: String,
-      default: null
-    },
-    addressProof: {
-      type: String,
-      default: null
-    },
-    submittedAt: {
-      type: Date,
-      default: null
-    }
+  kycId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'KYC',
+    default: null
   },
   walletAddress: {
     type: String,

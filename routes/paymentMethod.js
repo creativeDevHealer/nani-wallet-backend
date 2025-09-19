@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { verifyAppToken } = require('../controllers/auth');
 const {
   getPaymentMethods,
   addPaymentMethod,
@@ -7,6 +8,9 @@ const {
   deletePaymentMethod,
   verifyPaymentMethod
 } = require('../controllers/paymentMethodController');
+
+// All payment method routes require authentication
+router.use(verifyAppToken);
 
 // Get user's payment methods
 router.get('/:userId', getPaymentMethods);

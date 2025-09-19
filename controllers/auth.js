@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { ethers } = require('ethers');
 const User = require('../models/User');
+const KYC = require('../models/KYC');
 const Otp = require('../models/Otp');
 
 /**
@@ -56,17 +57,30 @@ async function verifyWeb3AuthToken(req, res) {
                 email: email?.toLowerCase() || `wallet_${walletAddress.slice(0, 8)}@naniwallet.com`,
                 fullName: fullName || 'Web3 User',
                 walletAddress: walletAddress,
-                emailVerified: true,
-                kycStatus: 'pending'
+                emailVerified: true
             });
             await user.save();
             console.log('✅ New user created with ID:', user._id);
+            
+            // Create initial KYC record
+            const kyc = await createInitialKYC(user._id);
+            user.kycId = kyc._id;
+            await user.save();
+            console.log('✅ KYC record linked to user');
         } else {
             // Update existing user with wallet address if not set
             if (!user.walletAddress) {
                 user.walletAddress = walletAddress;
                 await user.save();
                 console.log('✅ Updated existing user with wallet address');
+            }
+            
+            // Ensure existing user has KYC record (backward compatibility)
+            if (!user.kycId) {
+                const kyc = await createInitialKYC(user._id);
+                user.kycId = kyc._id;
+                await user.save();
+                console.log('✅ Created missing KYC record for existing user');
             }
         }
 
@@ -90,8 +104,7 @@ async function verifyWeb3AuthToken(req, res) {
                 email: user.email,
                 fullName: user.fullName,
                 walletAddress: user.walletAddress,
-                emailVerified: user.emailVerified,
-                kycStatus: user.kycStatus
+                emailVerified: user.emailVerified
             }
         });
 
@@ -270,6 +283,12 @@ async function registerUser(req, res) {
 
         await user.save();
         console.log('✅ User created successfully with ID:', user._id);
+        
+        // Create initial KYC record
+        const kyc = await createInitialKYC(user._id);
+        user.kycId = kyc._id;
+        await user.save();
+        console.log('✅ KYC record linked to user');
 
         // Clean up verified OTP
         await Otp.deleteOne({ _id: verifiedOtp._id });
@@ -288,7 +307,6 @@ async function registerUser(req, res) {
                 fullName: user.fullName,
                 phoneNumber: user.phoneNumber,
                 emailVerified: user.emailVerified,
-                kycStatus: user.kycStatus,
                 walletAddress: user.walletAddress
             }
         });
@@ -370,7 +388,6 @@ async function loginUser(req, res) {
                 fullName: user.fullName,
                 phoneNumber: user.phoneNumber,
                 emailVerified: user.emailVerified,
-                kycStatus: user.kycStatus,
                 walletAddress: user.walletAddress
             }
         });
@@ -410,6 +427,14 @@ async function verifyToken(req, res) {
                 error: 'User not found or inactive'
             });
         }
+        
+        // Ensure user has KYC record (backward compatibility)
+        if (!user.kycId) {
+            const kyc = await createInitialKYC(user._id);
+            user.kycId = kyc._id;
+            await user.save();
+            console.log('✅ Created missing KYC record during token verification');
+        }
 
         return res.status(200).json({
             success: true,
@@ -420,7 +445,6 @@ async function verifyToken(req, res) {
                 fullName: user.fullName,
                 phoneNumber: user.phoneNumber,
                 emailVerified: user.emailVerified,
-                kycStatus: user.kycStatus,
                 walletAddress: user.walletAddress
             }
         });
@@ -472,7 +496,6 @@ async function updateUserProfile(req, res) {
                 phoneNumber: user.phoneNumber,
                 photoURL: user.photoURL,
                 emailVerified: user.emailVerified,
-                kycStatus: user.kycStatus,
                 walletAddress: user.walletAddress
             }
         });
@@ -502,6 +525,14 @@ async function getUserProfile(req, res) {
                 error: 'User not found'
             });
         }
+        
+        // Ensure user has KYC record (backward compatibility)
+        if (!user.kycId) {
+            const kyc = await createInitialKYC(user._id);
+            user.kycId = kyc._id;
+            await user.save();
+            console.log('✅ Created missing KYC record during profile fetch');
+        }
 
         return res.status(200).json({
             success: true,
@@ -512,7 +543,6 @@ async function getUserProfile(req, res) {
                 phoneNumber: user.phoneNumber,
                 photoURL: user.photoURL,
                 emailVerified: user.emailVerified,
-                kycStatus: user.kycStatus,
                 walletAddress: user.walletAddress,
                 createdAt: user.createdAt,
                 lastLogin: user.lastLogin
@@ -525,6 +555,26 @@ async function getUserProfile(req, res) {
             success: false,
             error: 'Internal server error'
         });
+    }
+}
+
+/**
+ * Create initial KYC record for new user
+ * @param {string} userId - User ID
+ * @returns {Object} KYC record
+ */
+async function createInitialKYC(userId) {
+    try {
+        const kyc = new KYC({
+            userId: userId,
+            status: 'notstarted'
+        });
+        await kyc.save();
+        console.log('✅ Initial KYC record created for user:', userId);
+        return kyc;
+    } catch (error) {
+        console.error('❌ Failed to create initial KYC record:', error);
+        throw error;
     }
 }
 

@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { verifyAppToken } = require('../controllers/auth');
 const {
   getTransactionHistory,
   getTransaction,
@@ -9,6 +10,9 @@ const {
   broadcastTransaction,
   getTransactionStats
 } = require('../controllers/transactionController');
+
+// All transaction routes require authentication
+router.use(verifyAppToken);
 
 // Get transaction history for a user
 router.get('/history/:userId', getTransactionHistory);
