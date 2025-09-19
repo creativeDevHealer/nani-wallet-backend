@@ -95,6 +95,7 @@ app.use('/api/auth', authRateLimiter, authRouter)
 app.use('/api/transactions', transactionRouter)
 app.use('/api/payment-methods', paymentMethodRouter)
 app.use('/api/kyc', kycRouter)
+// Admin routes use general rate limiter instead of auth rate limiter for development
 app.use('/api/admin', adminRouter)
 
 // Test endpoint to check database connection
