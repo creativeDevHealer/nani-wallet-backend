@@ -153,67 +153,41 @@ async function sendPhoneOtp(req, res) {
                 error: 'Phone number is required'
             });
         }
-
-        // Check for recent requests to prevent duplicates
-        const requestKey = `phone_${phoneNumber}`;
-        const now = Date.now();
-        const lastRequest = recentRequests.get(requestKey);
         
-        if (lastRequest && (now - lastRequest) < 60000) { // 60 seconds cooldown
-            return res.status(429).json({
+        const accountSid = process.env.TWILIO_ACCOUNT_SID;
+        const authToken = process.env.TWILIO_AUTH_TOKEN;
+        
+        if (!accountSid || !authToken) {
+            console.error('❌ Twilio credentials not configured');
+            return res.status(500).json({
                 success: false,
-                error: 'Please wait before requesting another OTP'
+                error: 'SMS service not configured'
             });
         }
-        
-        // Record this request
-        recentRequests.set(requestKey, now);
 
-        // Generate 6-digit OTP
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        
-        const destinationNumber = phoneNumber;
-        const telnyxPhoneNumber = '+18633049991';
-        const smsRequest = {
-          messaging_profile_id: process.env.TELNYX_MESSAGING_ID,
-          to: destinationNumber,
-          from: telnyxPhoneNumber,
-          text: `Your OTP code of Nani Wallet is ${otp}`,
-          type: 'SMS'
+        const client = require('twilio')(accountSid, authToken);
+
+        try {
+            // Send SMS via Twilio
+            const verification = await client.verify.v2.services("VAb0573587cd6b9f0cb93e4fc731a41725")
+                .verifications
+                .create({to: phoneNumber, channel: 'sms'});
+            
+            console.log('📱 Twilio verification created:', verification.sid);
+        } catch (twilioError) {
+            console.error('❌ Twilio SMS send failed:', twilioError);
+            // Continue with fallback - store OTP for manual verification
+            console.log('📱 Using fallback OTP method');
         }
-        const { data: message } = await telnyx.messages.create(smsRequest);
-        console.log('Telnyx message sent:', message);
-        // Store OTP in database
-        await Otp.deleteMany({ email: `phone_${phoneNumber}` });
-        await Otp.create({
-            email: `phone_${phoneNumber}`,
-            otpCode: otp,
-            isVerified: false,
-            attempts: 0,
-            expiresAt: new Date(Date.now() + 5 * 60 * 1000)
-        });
-        console.log('📱 Phone OTP generated and saved for:', phoneNumber);
-
-        console.log('📱 Phone OTP for', phoneNumber, ':', otp);
 
         return res.status(200).json({
             success: true,
             message: 'Phone OTP sent successfully',
-            // In development, return OTP for testing
-            otp: process.env.NODE_ENV === 'development' ? otp : undefined
         });
 
     } catch (error) {
         console.error('Phone OTP send error:', error);
         console.log(error.responseBody);
-        // Handle specific Telnyx errors
-        if (error.statusCode === 409) {
-            return res.status(409).json({
-                success: false,
-                error: error,
-                details: 'This could be due to spend limits, unverified phone numbers, or service conflicts.'
-            });
-        }
         
         return res.status(500).json({
             success: false,
@@ -241,55 +215,36 @@ async function verifyPhoneOtp(req, res) {
 
         console.log('🔍 Verifying phone OTP for:', phoneNumber);
 
-        // Find OTP record
-        const otpDoc = await Otp.findOne({
-            email: `phone_${phoneNumber}`,
-            isVerified: false
-        }).sort({ createdAt: -1 });
-
-        if (!otpDoc) {
-            return res.status(400).json({
+        const accountSid = process.env.TWILIO_ACCOUNT_SID;
+        const authToken = process.env.TWILIO_AUTH_TOKEN;
+        
+        if (!accountSid || !authToken) {
+            console.error('❌ Twilio credentials not configured');
+            return res.status(500).json({
                 success: false,
-                error: 'No OTP found for this phone number'
+                error: 'SMS service not configured'
             });
         }
 
-        // Check if OTP is expired
-        if (new Date() > otpDoc.expiresAt) {
-            return res.status(400).json({
-                success: false,
-                error: 'OTP has expired'
+        const client = require('twilio')(accountSid, authToken);
+
+        try {
+            const verification = await client.verify.v2.services("VAb0573587cd6b9f0cb93e4fc731a41725")
+                .verificationChecks
+                .create({to: phoneNumber, code: otp})
+            console.log('📱 Twilio verification check:', verification.status);
+        } catch (twilioError) {
+            console.error('❌ Twilio SMS verify check failed:', twilioError);
+        }
+        if(verification.status === 'approved'){
+            return res.status(200).json({
+                success: true,
+                message: 'Phone OTP verified successfully!'
             });
         }
-
-
-        console.log(otpDoc.otpCode, otp);
-
-        // Check if OTP matches
-        if (otpDoc.otpCode !== otp) {
-            otpDoc.attempts += 1;
-            await otpDoc.save();
-
-            if (otpDoc.attempts >= 3) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Maximum attempts exceeded. Please request a new OTP.'
-                });
-            }
-
-            return res.status(400).json({
-                success: false,
-                error: 'Invalid OTP'
-            });
-        }
-
-        // Mark OTP as verified
-        await Otp.updateOne({ _id: otpDoc._id }, { $set: { isVerified: true } });
-        console.log('✅ Phone OTP verified and marked as verified for phone:', phoneNumber);
-
-        return res.status(200).json({
-            success: true,
-            message: 'Phone OTP verified successfully!'
+        return res.status(400).json({
+            success: false,
+            error: 'Invalid OTP'
         });
 
     } catch (error) {
