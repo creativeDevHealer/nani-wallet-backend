@@ -28,6 +28,12 @@ const rateLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  // Custom key generator with fallback for proxy issues
+  keyGenerator: (req) => {
+    return req.ip || req.connection.remoteAddress || 'unknown';
+  },
+  // Skip failed requests to avoid false positives
+  skipFailedRequests: true,
 });
 
 /**
@@ -42,6 +48,10 @@ const authRateLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => {
+    return req.ip || req.connection.remoteAddress || 'unknown';
+  },
+  skipFailedRequests: true,
 });
 
 /**
@@ -56,6 +66,10 @@ const otpRateLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => {
+    return req.ip || req.connection.remoteAddress || 'unknown';
+  },
+  skipFailedRequests: true,
 });
 
 module.exports = {

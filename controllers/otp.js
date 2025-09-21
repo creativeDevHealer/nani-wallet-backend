@@ -227,15 +227,17 @@ async function verifyPhoneOtp(req, res) {
         }
 
         const client = require('twilio')(accountSid, authToken);
-
+        let verification;
         try {
-            const verification = await client.verify.v2.services("VAb0573587cd6b9f0cb93e4fc731a41725")
+            verification = await client.verify.v2.services("VAb0573587cd6b9f0cb93e4fc731a41725")
                 .verificationChecks
                 .create({to: phoneNumber, code: otp})
             console.log('📱 Twilio verification check:', verification.status);
+            
         } catch (twilioError) {
             console.error('❌ Twilio SMS verify check failed:', twilioError);
         }
+
         if(verification.status === 'approved'){
             return res.status(200).json({
                 success: true,

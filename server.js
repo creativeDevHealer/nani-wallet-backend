@@ -22,6 +22,30 @@ const { securityHeaders, rateLimiter, authRateLimiter, otpRateLimiter } = requir
 const app = express()
 const port = process.env.PORT || 3000
 
+// Trust proxy configuration - Required for proper rate limiting behind reverse proxy
+// This is essential when deployed behind nginx, AWS ALB, CloudFlare, etc.
+if (process.env.NODE_ENV === 'production') {
+    // In production, trust the first proxy (nginx, ALB, etc.)
+    app.set('trust proxy', 1)
+} else {
+    // In development, trust all proxies for testing
+    app.set('trust proxy', true)
+}
+
+// Debug middleware for proxy headers (development only)
+if (process.env.NODE_ENV === 'development') {
+    app.use((req, res, next) => {
+        if (req.headers['x-forwarded-for']) {
+            console.log('🔍 Proxy Headers Debug:');
+            console.log('  X-Forwarded-For:', req.headers['x-forwarded-for']);
+            console.log('  X-Real-IP:', req.headers['x-real-ip']);
+            console.log('  Client IP:', req.ip);
+            console.log('  IPs:', req.ips);
+        }
+        next();
+    });
+}
+
 // Security middleware
 app.use(securityHeaders)
 app.use(requestId)
