@@ -295,9 +295,9 @@ const getTransactionsByEthAddress = async (req, res) => {
 const storeTransactionHistory = async (req, res) => {
   try {
     const {
-      ethaddress,
       txHash,
       toAddress,
+      senderAddress,
       amountUSD,
       type,
       token,
@@ -310,7 +310,6 @@ const storeTransactionHistory = async (req, res) => {
       currency,
       tokenAddress,
       recipientAddress,
-      senderAddress,
       blockNumber,
       gasUsed,
       gasPrice,
@@ -322,18 +321,18 @@ const storeTransactionHistory = async (req, res) => {
     } = req.body;
     
     // Validate required fields
-    if (!ethaddress || !txHash || !toAddress || !amountUSD || !type || !token || !network) {
+    if (!txHash || !toAddress || !amountUSD || !type || !token || !network || !senderAddress || !toAddress) {
       return res.status(400).json({
         success: false,
-        error: 'Missing required fields: ethaddress, txHash, toAddress, amountUSD, type, token, network'
+        error: 'Missing required fields: txHash, toAddress, amountUSD, type, token, network, senderAddress, toAddress'
       });
     }
     
     // Validate ETH address format
-    if (!ethers.isAddress(ethaddress)) {
+    if (!ethers.isAddress(senderAddress)) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid ETH address format'
+        error: 'Invalid senderAddress format'
       });
     }
     
@@ -355,7 +354,7 @@ const storeTransactionHistory = async (req, res) => {
     }
     
     const transaction = new Transaction({
-      ethaddress: ethaddress.toLowerCase(),
+      senderAddress: senderAddress.toLowerCase(),
       txHash,
       toAddress: toAddress.toLowerCase(),
       amountUSD,
@@ -370,7 +369,6 @@ const storeTransactionHistory = async (req, res) => {
       currency,
       tokenAddress,
       recipientAddress,
-      senderAddress,
       blockNumber,
       gasUsed,
       gasPrice,

@@ -13,7 +13,6 @@ const transactionSchema = new mongoose.Schema({
   // New required fields based on requirements
   ethaddress: {
     type: String,
-    required: true,
     index: true
   },
   timestamp: {
