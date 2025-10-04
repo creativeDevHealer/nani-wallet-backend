@@ -381,6 +381,43 @@ const storeTransactionHistory = async (req, res) => {
   }
 };
 
+// Update transaction by txHash
+const updateTransactionByHash = async (req, res) => {
+  try {
+    const { txHash } = req.params;
+    const updateData = req.body;
+    
+    // Remove fields that shouldn't be updated
+    delete updateData.txHash;
+    delete updateData._id;
+    delete updateData.createdAt;
+    
+    const transaction = await Transaction.findOneAndUpdate(
+      { txHash },
+      updateData,
+      { new: true }
+    );
+    
+    if (!transaction) {
+      return res.status(404).json({
+        success: false,
+        error: 'Transaction not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: transaction
+    });
+  } catch (error) {
+    console.error('Error updating transaction by hash:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update transaction'
+    });
+  }
+};
+
 // Get transaction statistics
 const getTransactionStats = async (req, res) => {
   try {
@@ -429,5 +466,6 @@ module.exports = {
   broadcastTransaction,
   getTransactionStats,
   getTransactionsByEthAddress,
-  storeTransactionHistory
+  storeTransactionHistory,
+  updateTransactionByHash
 };

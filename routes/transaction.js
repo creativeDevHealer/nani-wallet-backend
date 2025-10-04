@@ -10,7 +10,8 @@ const {
   broadcastTransaction,
   getTransactionStats,
   getTransactionsByEthAddress,
-  storeTransactionHistory
+  storeTransactionHistory,
+  updateTransactionByHash
 } = require('../controllers/transactionController');
 
 // Public routes (no authentication required)
@@ -19,6 +20,9 @@ router.get('/eth/:ethaddress', getTransactionsByEthAddress);
 
 // Store transaction history (public endpoint for blockchain monitoring)
 router.post('/store', storeTransactionHistory);
+
+// Update transaction by hash (public endpoint for blockchain monitoring)
+router.put('/hash/:txHash', updateTransactionByHash);
 
 // All other transaction routes require authentication
 router.use(verifyAppToken);
