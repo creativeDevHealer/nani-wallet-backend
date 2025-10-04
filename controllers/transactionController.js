@@ -361,20 +361,20 @@ const storeTransactionHistory = async (req, res) => {
     }
     
     // Validate ETH address format
-    if (!ethers.isAddress(senderAddress)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid senderAddress format'
-      });
-    }
+    // if (!ethers.isAddress(senderAddress)) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     error: 'Invalid senderAddress format'
+    //   });
+    // }
     
-    // Validate toAddress format
-    if (!ethers.isAddress(toAddress)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid toAddress format'
-      });
-    }
+    // // Validate toAddress format
+    // if (!ethers.isAddress(toAddress)) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     error: 'Invalid toAddress format'
+    //   });
+    // }
     
     // Check if transaction already exists
     const existingTransaction = await Transaction.findOne({ txHash });
