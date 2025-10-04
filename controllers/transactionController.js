@@ -253,7 +253,7 @@ const getTransactionsByEthAddress = async (req, res) => {
     
     const query = {
       $or: [
-        { recipientAddress: { $in: addresses } },
+        { toAddress: { $in: addresses } },
         { senderAddress: { $in: addresses } }
       ]
     };
