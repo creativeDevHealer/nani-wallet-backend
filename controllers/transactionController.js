@@ -232,7 +232,7 @@ const broadcastTransaction = async (req, res) => {
 const getTransactionsByEthAddress = async (req, res) => {
   try {
     const { ethaddress } = req.params;
-    const { page = 1, limit = 20, type, status, token, network } = req.query;
+    const { page = 1, limit = 20, type, status, token, network, soladdress } = req.query;
     
     // Validate ETH address format
     if (!ethers.isAddress(ethaddress)) {
@@ -242,7 +242,22 @@ const getTransactionsByEthAddress = async (req, res) => {
       });
     }
     
-    const query = { ethaddress: ethaddress.toLowerCase() };
+    // Build query to search for transactions where the address is either ethaddress or senderAddress
+    const addressQuery = ethaddress.toLowerCase();
+    const addresses = [addressQuery];
+    
+    // Add SOL address if provided
+    if (soladdress) {
+      addresses.push(soladdress.toLowerCase());
+    }
+    
+    const query = {
+      $or: [
+        { recipientAddress: { $in: addresses } },
+        { senderAddress: { $in: addresses } }
+      ]
+    };
+    
     if (type) query.type = type;
     if (status) query.status = status;
     if (token) query.token = token;
