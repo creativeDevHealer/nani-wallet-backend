@@ -8,10 +8,19 @@ const {
   updateTransactionStatus,
   estimateGas,
   broadcastTransaction,
-  getTransactionStats
+  getTransactionStats,
+  getTransactionsByEthAddress,
+  storeTransactionHistory
 } = require('../controllers/transactionController');
 
-// All transaction routes require authentication
+// Public routes (no authentication required)
+// Get transactions by ETH address
+router.get('/eth/:ethaddress', getTransactionsByEthAddress);
+
+// Store transaction history (public endpoint for blockchain monitoring)
+router.post('/store', storeTransactionHistory);
+
+// All other transaction routes require authentication
 router.use(verifyAppToken);
 
 // Get transaction history for a user

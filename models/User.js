@@ -59,6 +59,32 @@ const userSchema = new mongoose.Schema({
   lockUntil: {
     type: Date,
     default: null
+  },
+  fcmToken: {
+    type: String,
+    default: null
+  },
+  notificationSettings: {
+    pushEnabled: {
+      type: Boolean,
+      default: true
+    },
+    transactionNotifications: {
+      type: Boolean,
+      default: true
+    },
+    kycNotifications: {
+      type: Boolean,
+      default: true
+    },
+    securityNotifications: {
+      type: Boolean,
+      default: true
+    },
+    promotionalNotifications: {
+      type: Boolean,
+      default: false
+    }
   }
 }, {
   timestamps: true

@@ -4,15 +4,48 @@ const transactionSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: false // Made optional to support transactions by ethaddress
   },
   walletId: {
+    type: String,
+    required: false // Made optional
+  },
+  // New required fields based on requirements
+  ethaddress: {
+    type: String,
+    required: true,
+    index: true
+  },
+  timestamp: {
+    type: Date,
+    required: true,
+    default: Date.now
+  },
+  txHash: {
+    type: String,
+    required: true,
+    unique: true,
+    index: true
+  },
+  toAddress: {
+    type: String,
+    required: true
+  },
+  amountUSD: {
+    type: Number,
+    required: true
+  },
+  token: {
+    type: String,
+    required: true
+  },
+  network: {
     type: String,
     required: true
   },
   type: {
     type: String,
-    enum: ['send', 'receive', 'top_up', 'swap'],
+    enum: ['send', 'receive', 'top_up', 'swap', 'transfer'],
     required: true
   },
   status: {
@@ -20,13 +53,14 @@ const transactionSchema = new mongoose.Schema({
     enum: ['pending', 'confirmed', 'failed', 'cancelled'],
     default: 'pending'
   },
+  // Legacy fields for backward compatibility
   amount: {
     type: String,
-    required: true
+    required: false
   },
   currency: {
     type: String,
-    required: true
+    required: false
   },
   tokenAddress: {
     type: String,
@@ -107,9 +141,12 @@ const transactionSchema = new mongoose.Schema({
 
 // Indexes for better query performance
 transactionSchema.index({ userId: 1, createdAt: -1 });
+transactionSchema.index({ ethaddress: 1, timestamp: -1 }); // For fetching by ethaddress
 transactionSchema.index({ txHash: 1 });
 transactionSchema.index({ status: 1 });
 transactionSchema.index({ type: 1 });
+transactionSchema.index({ network: 1 });
+transactionSchema.index({ token: 1 });
 
 // Update the updatedAt field before saving
 transactionSchema.pre('save', function(next) {

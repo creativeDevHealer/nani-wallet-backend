@@ -12,6 +12,7 @@ const authRouter = require('./routes/auth')
 const transactionRouter = require('./routes/transaction')
 const paymentMethodRouter = require('./routes/paymentMethod')
 const kycRouter = require('./routes/kyc')
+const notificationRouter = require('./routes/notification')
 const adminRouter = require('./routes/admin')
 
 // Import middleware
@@ -119,6 +120,7 @@ app.use('/api/auth', authRateLimiter, authRouter)
 app.use('/api/transactions', transactionRouter)
 app.use('/api/payment-methods', paymentMethodRouter)
 app.use('/api/kyc', kycRouter)
+app.use('/api/notifications', notificationRouter)
 // Admin routes use general rate limiter instead of auth rate limiter for development
 app.use('/api/admin', adminRouter)
 

@@ -1,6 +1,7 @@
 const Transaction = require('../models/Transaction');
 const PaymentMethod = require('../models/PaymentMethod');
 const { ethers } = require('ethers');
+const { createTransactionNotification } = require('./notificationController');
 
 // Get transaction history for a user
 const getTransactionHistory = async (req, res) => {
@@ -142,6 +143,16 @@ const updateTransactionStatus = async (req, res) => {
         error: 'Transaction not found'
       });
     }
+
+    // Create notification when transaction status changes to confirmed
+    if (status === 'confirmed') {
+      try {
+        await createTransactionNotification(transaction.userId, transaction);
+      } catch (notificationError) {
+        console.warn('Failed to create transaction notification:', notificationError);
+        // Don't fail the request if notification creation fails
+      }
+    }
     
     res.json({
       success: true,
@@ -217,6 +228,159 @@ const broadcastTransaction = async (req, res) => {
   }
 };
 
+// Get transactions by ETH address
+const getTransactionsByEthAddress = async (req, res) => {
+  try {
+    const { ethaddress } = req.params;
+    const { page = 1, limit = 20, type, status, token, network } = req.query;
+    
+    // Validate ETH address format
+    if (!ethers.isAddress(ethaddress)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid ETH address format'
+      });
+    }
+    
+    const query = { ethaddress: ethaddress.toLowerCase() };
+    if (type) query.type = type;
+    if (status) query.status = status;
+    if (token) query.token = token;
+    if (network) query.network = network;
+    
+    const transactions = await Transaction.find(query)
+      .sort({ timestamp: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .populate('userId', 'fullName email');
+    
+    const total = await Transaction.countDocuments(query);
+    
+    res.json({
+      success: true,
+      data: {
+        transactions,
+        pagination: {
+          current: parseInt(page),
+          pages: Math.ceil(total / limit),
+          total
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching transactions by ETH address:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch transactions'
+    });
+  }
+};
+
+// Store transaction history
+const storeTransactionHistory = async (req, res) => {
+  try {
+    const {
+      ethaddress,
+      txHash,
+      toAddress,
+      amountUSD,
+      type,
+      token,
+      network,
+      status = 'pending',
+      timestamp,
+      userId,
+      // Optional fields for backward compatibility
+      amount,
+      currency,
+      tokenAddress,
+      recipientAddress,
+      senderAddress,
+      blockNumber,
+      gasUsed,
+      gasPrice,
+      chainId,
+      paymentMethod,
+      purpose,
+      kycVerified,
+      metadata
+    } = req.body;
+    
+    // Validate required fields
+    if (!ethaddress || !txHash || !toAddress || !amountUSD || !type || !token || !network) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: ethaddress, txHash, toAddress, amountUSD, type, token, network'
+      });
+    }
+    
+    // Validate ETH address format
+    if (!ethers.isAddress(ethaddress)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid ETH address format'
+      });
+    }
+    
+    // Validate toAddress format
+    if (!ethers.isAddress(toAddress)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid toAddress format'
+      });
+    }
+    
+    // Check if transaction already exists
+    const existingTransaction = await Transaction.findOne({ txHash });
+    if (existingTransaction) {
+      return res.status(409).json({
+        success: false,
+        error: 'Transaction with this hash already exists'
+      });
+    }
+    
+    const transaction = new Transaction({
+      ethaddress: ethaddress.toLowerCase(),
+      txHash,
+      toAddress: toAddress.toLowerCase(),
+      amountUSD,
+      type,
+      token,
+      network,
+      status,
+      timestamp: timestamp ? new Date(timestamp) : new Date(),
+      userId: userId || null,
+      // Legacy fields
+      amount,
+      currency,
+      tokenAddress,
+      recipientAddress,
+      senderAddress,
+      blockNumber,
+      gasUsed,
+      gasPrice,
+      chainId,
+      paymentMethod,
+      purpose,
+      kycVerified,
+      metadata
+    });
+    
+    await transaction.save();
+    
+    res.status(201).json({
+      success: true,
+      data: transaction
+    });
+  } catch (error) {
+    console.error('Error storing transaction history:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to store transaction history'
+    });
+  }
+};
+
 // Get transaction statistics
 const getTransactionStats = async (req, res) => {
   try {
@@ -263,5 +427,7 @@ module.exports = {
   updateTransactionStatus,
   estimateGas,
   broadcastTransaction,
-  getTransactionStats
+  getTransactionStats,
+  getTransactionsByEthAddress,
+  storeTransactionHistory
 };
