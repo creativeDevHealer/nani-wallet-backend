@@ -117,7 +117,7 @@ app.get('/api/image/:folder/:filename', (req, res) => {
 // Apply stricter rate limiting to sensitive endpoints
 app.use('/api/otp', otpRateLimiter, otpRouter)
 app.use('/api/auth', authRateLimiter, authRouter)
-app.use('/api/transactions', transactionRouter)
+app.use('/api/transaction', transactionRouter)
 app.use('/api/payment-methods', paymentMethodRouter)
 app.use('/api/kyc', kycRouter)
 app.use('/api/notifications', notificationRouter)
