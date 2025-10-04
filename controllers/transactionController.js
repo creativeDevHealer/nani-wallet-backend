@@ -251,17 +251,46 @@ const getTransactionsByEthAddress = async (req, res) => {
       addresses.push(soladdress.toLowerCase());
     }
     
-    const query = {
-      $or: [
-        { toAddress: { $in: addresses } },
-        { senderAddress: { $in: addresses } }
-      ]
-    };
+    // Build query based on type
+    let query = {};
     
-    if (type) query.type = type;
+    if (type === 'send') {
+      // For 'send' requests, only look at senderAddress (transactions sent FROM this wallet)
+      query = {
+        senderAddress: { $in: addresses },
+        type: 'transfer'
+      };
+    } else if (type === 'receive') {
+      // For 'receive' requests, only look at toAddress (transactions sent TO this wallet)
+      query = {
+        toAddress: { $in: addresses },
+        type: 'transfer'
+      };
+    } else {
+      // For 'all' requests, look at both senderAddress and toAddress
+      query = {
+        $or: [
+          { toAddress: { $in: addresses } },
+          { senderAddress: { $in: addresses } }
+        ]
+      };
+      
+      // Handle type mapping for 'all' requests
+      if (type) {
+        if (type === 'send') {
+          query.type = 'transfer';
+        } else if (type === 'receive') {
+          query.type = 'transfer';
+        } else {
+          query.type = type;
+        }
+      }
+    }
     if (status) query.status = status;
     if (token) query.token = token;
     if (network) query.network = network;
+    
+    console.log('🔍 Backend query:', JSON.stringify(query, null, 2));
     
     const transactions = await Transaction.find(query)
       .sort({ timestamp: -1 })
@@ -270,6 +299,9 @@ const getTransactionsByEthAddress = async (req, res) => {
       .populate('userId', 'fullName email');
     
     const total = await Transaction.countDocuments(query);
+    
+    console.log('🔍 Found transactions:', transactions.length);
+    console.log('🔍 Total count:', total);
     
     res.json({
       success: true,
