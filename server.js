@@ -60,6 +60,7 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization', 'x-request-id']
 }))
 
+app.options("*", cors());
 // Body parsing middleware
 app.use(express.json({ limit: "50mb" }))
 app.use(express.urlencoded({ extended: true, limit: "50mb" }))
