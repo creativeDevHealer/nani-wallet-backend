@@ -39,10 +39,10 @@ app.set("trust proxy", true);
 -------------------------------------------------- */
 const ADMIN_ORIGIN = "https://pm4e1y0uu4w9i0-3000.proxy.runpod.net";
 
-app.options("*", cors({
+app.options(/.*/, cors({
   origin: ADMIN_ORIGIN,
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "x-request-id"],
 }));
 
@@ -52,7 +52,7 @@ app.options("*", cors({
 app.use(cors({
   origin: ADMIN_ORIGIN,
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "x-request-id"],
 }));
 
