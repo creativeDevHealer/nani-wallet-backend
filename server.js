@@ -1,194 +1,146 @@
-const express = require('express')
-const dotenv = require("dotenv")
-const cors = require("cors")
-const { connectMongo } = require('./config/mongodb')
+const express = require("express");
+const dotenv = require("dotenv");
+const cors = require("cors");
+const path = require("path");
+const { connectMongo } = require("./config/mongodb");
 
-// Load environment variables
-dotenv.config()
+// Load env
+dotenv.config();
 
-// Import routes
-const otpRouter = require('./routes/otp')
-const authRouter = require('./routes/auth')
-const transactionRouter = require('./routes/transaction')
-const paymentMethodRouter = require('./routes/paymentMethod')
-const kycRouter = require('./routes/kyc')
-const notificationRouter = require('./routes/notification')
-const adminRouter = require('./routes/admin')
+// Routes
+const otpRouter = require("./routes/otp");
+const authRouter = require("./routes/auth");
+const transactionRouter = require("./routes/transaction");
+const paymentMethodRouter = require("./routes/paymentMethod");
+const kycRouter = require("./routes/kyc");
+const notificationRouter = require("./routes/notification");
+const adminRouter = require("./routes/admin");
 
-// Import middleware
-const { requestLogger, requestId } = require('./middlewares/logger')
-const { errorHandler, notFoundHandler } = require('./middlewares/errorHandler')
-const { securityHeaders, rateLimiter, authRateLimiter, otpRateLimiter } = require('./middlewares/security')
+// Middleware
+const { requestLogger, requestId } = require("./middlewares/logger");
+const { errorHandler, notFoundHandler } = require("./middlewares/errorHandler");
+const {
+  securityHeaders,
+  rateLimiter,
+  authRateLimiter,
+  otpRateLimiter,
+} = require("./middlewares/security");
 
-const app = express()
-const port = process.env.PORT || 3000
+const app = express();
+const port = process.env.PORT || 6000;
 
-// Trust proxy configuration - Required for proper rate limiting behind reverse proxy
-// This is essential when deployed behind nginx, AWS ALB, CloudFlare, etc.
-if (process.env.NODE_ENV === 'production') {
-    // In production, trust the first proxy (nginx, ALB, etc.)
-    app.set('trust proxy', 1)
-} else {
-    // In development, trust all proxies for testing
-    app.set('trust proxy', true)
-}
+/* --------------------------------------------------
+   TRUST PROXY (required for RunPod / reverse proxy)
+-------------------------------------------------- */
+app.set("trust proxy", true);
 
-// Debug middleware for proxy headers (development only)
-if (process.env.NODE_ENV === 'development') {
-    app.use((req, res, next) => {
-        if (req.headers['x-forwarded-for']) {
-            console.log('🔍 Proxy Headers Debug:');
-            console.log('  X-Forwarded-For:', req.headers['x-forwarded-for']);
-            console.log('  X-Real-IP:', req.headers['x-real-ip']);
-            console.log('  Client IP:', req.ip);
-            console.log('  IPs:', req.ips);
-        }
-        next();
-    });
-}
+/* --------------------------------------------------
+   🔥 PRE-FLIGHT MUST BE FIRST (CRITICAL)
+-------------------------------------------------- */
+const ADMIN_ORIGIN = "https://pm4e1y0uu4w9i0-3000.proxy.runpod.net";
 
-// Security middleware
-app.use(securityHeaders)
-app.use(requestId)
-app.use(requestLogger)
+app.options("*", cors({
+  origin: ADMIN_ORIGIN,
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "x-request-id"],
+}));
 
-// CORS configuration - Allow all origins for development
+/* --------------------------------------------------
+   CORS (MUST BE BEFORE ALL OTHER MIDDLEWARE)
+-------------------------------------------------- */
 app.use(cors({
-    origin: true, // Allow all origins in development
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-request-id']
-}))
+  origin: ADMIN_ORIGIN,
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "x-request-id"],
+}));
 
-app.options(/.*/, cors());
-// Body parsing middleware
-app.use(express.json({ limit: "50mb" }))
-app.use(express.urlencoded({ extended: true, limit: "50mb" }))
+/* --------------------------------------------------
+   BODY PARSING
+-------------------------------------------------- */
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
-// Static file serving for uploads with CORS headers
-const path = require('path');
+/* --------------------------------------------------
+   SECURITY & LOGGING (AFTER CORS)
+-------------------------------------------------- */
+app.use(securityHeaders);
+app.use(requestId);
+app.use(requestLogger);
 
-// Handle preflight requests for uploads
-app.options('/uploads/:folder/:filename', (req, res) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-    res.header('Access-Control-Max-Age', '86400'); // Cache preflight for 24 hours
-    res.sendStatus(200);
-});
-
-// Serve static files with explicit CORS headers
-app.use('/uploads', (req, res, next) => {
-    // Set CORS headers for all responses
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-    res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+/* --------------------------------------------------
+   STATIC UPLOADS (SAFE CORS)
+-------------------------------------------------- */
+app.use(
+  "/uploads",
+  (req, res, next) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     next();
-}, express.static(path.join(__dirname, 'uploads')));
+  },
+  express.static(path.join(__dirname, "uploads"))
+);
 
-// Rate limiting
-app.use('/api/', rateLimiter)
+/* --------------------------------------------------
+   RATE LIMITER (SKIP OPTIONS!)
+-------------------------------------------------- */
+app.use("/api", (req, res, next) => {
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  next();
+}, rateLimiter);
 
-// Image proxy endpoint to bypass CORS issues
-app.get('/api/image/:folder/:filename', (req, res) => {
-    const { folder, filename } = req.params;
-    const imagePath = path.join(__dirname, 'uploads', folder, filename);
-    
-    // Set CORS headers
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET');
-    res.header('Cross-Origin-Resource-Policy', 'cross-origin');
-    
-    // Check if download is requested
-    const isDownload = req.query.download === 'true';
-    if (isDownload) {
-        res.header('Content-Disposition', `attachment; filename="${filename}"`);
-        res.header('Content-Type', 'application/octet-stream');
-    }
-    
-    // Send the file
-    res.sendFile(imagePath, (err) => {
-        if (err) {
-            res.status(404).json({ error: 'Image not found' });
-        }
-    });
+/* --------------------------------------------------
+   ROUTES
+-------------------------------------------------- */
+app.use("/api/otp", otpRateLimiter, otpRouter);
+app.use("/api/auth", authRateLimiter, authRouter);
+app.use("/api/transaction", transactionRouter);
+app.use("/api/payment-methods", paymentMethodRouter);
+app.use("/api/kyc", kycRouter);
+app.use("/api/notifications", notificationRouter);
+app.use("/api/admin", adminRouter);
+
+/* --------------------------------------------------
+   HEALTH & TEST
+-------------------------------------------------- */
+app.get("/api/health", (req, res) => {
+  res.json({
+    success: true,
+    message: "Backend running",
+    time: new Date().toISOString(),
+  });
 });
 
-// Apply stricter rate limiting to sensitive endpoints
-app.use('/api/otp', otpRateLimiter, otpRouter)
-app.use('/api/auth', authRateLimiter, authRouter)
-app.use('/api/transaction', transactionRouter)
-app.use('/api/payment-methods', paymentMethodRouter)
-app.use('/api/kyc', kycRouter)
-app.use('/api/notifications', notificationRouter)
-// Admin routes use general rate limiter instead of auth rate limiter for development
-app.use('/api/admin', adminRouter)
-
-// Test endpoint to check database connection
-app.get('/api/test-db', async (req, res) => {
-    try {
-        const mongoose = require('mongoose');
-        const connectionState = mongoose.connection.readyState;
-        const states = {
-            0: 'disconnected',
-            1: 'connected',
-            2: 'connecting',
-            3: 'disconnecting'
-        };
-
-        res.json({
-            success: true,
-            message: 'Database connection test',
-            connectionState: states[connectionState],
-            isConnected: connectionState === 1
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
+app.get("/api/test-db", async (req, res) => {
+  const mongoose = require("mongoose");
+  res.json({
+    connected: mongoose.connection.readyState === 1,
+  });
 });
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-    res.json({
-        success: true,
-        message: 'Backend server is running',
-        timestamp: new Date().toISOString(),
-        version: '1.0.0'
-    });
-});
+/* --------------------------------------------------
+   ERROR HANDLERS (LAST)
+-------------------------------------------------- */
+app.use(notFoundHandler);
+app.use(errorHandler);
 
-// Error handling middleware (must be last)
-app.use(notFoundHandler)
-app.use(errorHandler)
-
-// Initialize MongoDB and start server
+/* --------------------------------------------------
+   START SERVER
+-------------------------------------------------- */
 const startServer = async () => {
-    try {
-        await connectMongo();
-        app.listen(port, "0.0.0.0", () => {
-            console.log(`🚀 Server running on http://localhost:${port}`)
-            console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`)
-            console.log(`🗄️  Database: ${process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/naniwallet'}`)
-        });
-    } catch (error) {
-        console.error('❌ Failed to start server:', error);
-        process.exit(1);
-    }
+  try {
+    await connectMongo();
+    app.listen(port, "0.0.0.0", () => {
+      console.log(`🚀 API running on port ${port}`);
+    });
+  } catch (err) {
+    console.error("❌ Startup failed:", err);
+    process.exit(1);
+  }
 };
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-    console.log('🛑 SIGTERM received, shutting down gracefully');
-    process.exit(0);
-});
-
-process.on('SIGINT', () => {
-    console.log('🛑 SIGINT received, shutting down gracefully');
-    process.exit(0);
-});
+process.on("SIGINT", () => process.exit(0));
+process.on("SIGTERM", () => process.exit(0));
 
 startServer();
